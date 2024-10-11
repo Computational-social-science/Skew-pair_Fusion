@@ -19,25 +19,20 @@ from datasets import Dataset
 from tqdm import tqdm
 from datasets import Dataset, DatasetDict, Features, Value, Array4D, concatenate_datasets, load_from_disk
 def load_and_combine_batches(save_dir, partition_name):
-    """加载特定分区的所有批次，然后合并为一个数据集，显示进度条。"""
     batch_folders = [os.path.join(save_dir, partition_name, d) for d in
                      os.listdir(os.path.join(save_dir, partition_name))
                      if os.path.isdir(os.path.join(save_dir, partition_name, d))]
-    # 添加进度条
     datasets = [Dataset.load_from_disk(folder) for folder in
                 tqdm(sorted(batch_folders), desc=f"Loading batches from {partition_name}")]
     combined_dataset = concatenate_datasets(datasets)
     return combined_dataset
 
-
 def create_dataset_dict(save_dir):
-    """创建包含训练集和测试集的DatasetDict，并设置为torch格式，显示进度条。"""
     print("Loading training data...")
     train_dataset = load_and_combine_batches(save_dir, 'train')
     print("Loading testing data...")
     test_dataset = load_and_combine_batches(save_dir, 'test')
 
-    # 将训练集和测试集设置为torch格式
     train_dataset.set_format(type='torch', columns=['pixel_values','input_values','labels'])
     test_dataset.set_format(type='torch', columns=['pixel_values','input_values','labels'])
 
@@ -46,7 +41,7 @@ def create_dataset_dict(save_dir):
         'test': test_dataset
     })
     return dataset_dict
-# input_values,attention_mask_audio,token_type_ids,position_ids,head_mask,inputs_embeds,labels,output_attentions,output_hidden_states,return_dict,label_ids,labels,label.
+
 os.environ['http_proxy'] = 'http://127.0.0.1:10809'
 os.environ['https_proxy'] = 'http://127.0.0.1:10809'
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
@@ -60,7 +55,7 @@ dataset = create_dataset_dict(save_dir)
 train_dataset = dataset['train']
 test_dataset = dataset['test']
 
-# # 简单融合
+# # Simple fusion
 # class Concatenation(nn.Module):
 #     def __init__(self, feature_size=768):
 #         super(Concatenation, self).__init__()
@@ -80,7 +75,7 @@ layer_norm_eps = 1e-5
 dim_feedforward = 3072
 
 
-# 使用注意力机制融合模块
+# CoAttention
 class CoAttention(nn.Module):
     def __init__(self, feature_size=768):
         super(CoAttention, self).__init__()
@@ -163,13 +158,11 @@ class FusionModel(nn.Module):
     def __init__(self):
         super(FusionModel, self).__init__()
 
-        # 分别选择文本basemodel以及语音的basemodel
         self.audio_model = Wav2Vec2Model.from_pretrained("E:/audio_only/wav2vec12layers/", output_hidden_states=True)
         # self.audio_model = AutoModelForPreTraining.from_pretrained("facebook/wav2vec2-base", output_hidden_states =
         # True)
         self.img_model = TimesformerModel.from_pretrained("E:/video_model/12layers/", output_hidden_states=True)#checkpoint1
 
-        # 选择融合机制
         self.fusion_model = CoAttention()
         # self.fusion_model = Concatenation()
         self.dropout = nn.Dropout(0.1)
@@ -189,7 +182,7 @@ class FusionModel(nn.Module):
         outputs_img = self.img_model(pixel_values)
 
 
-       ## 指定融合的匹配策略
+
         layer_fusion1 = self.fusion_model(outputs_audio.hidden_states[12][:, 0, :],outputs_img.hidden_states[12][:,0,:])
         layer_fusion2 = self.fusion_model(outputs_audio.hidden_states[11][:, 0, :],outputs_img.hidden_states[11][:,0,:])
         layer_fusion3 = self.fusion_model(outputs_audio.hidden_states[10][:, 0, :],outputs_img.hidden_states[10][:,0,:])
@@ -210,7 +203,6 @@ class FusionModel(nn.Module):
         # + layer_fusion10 + layer_fusion11 + layer_fusion12
         # outputs_fusion = 0.0002443*layer_fusion1 + 0.0004886*layer_fusion2 + 0.0009772*layer_fusion3 + 0.0019544*layer_fusion4 + 0.0039088*layer_fusion5 + 0.0078176*layer_fusion6 + 0.0156352*layer_fusion7 + 0.0312704*layer_fusion8 + 0.0625408*layer_fusion9 + 0.1250816*layer_fusion10 + 0.2501632*layer_fusion11 + 0.5003264*layer_fusion12
 
-        # 将融合好的特征进行分类
         logits = self.linear(outputs_fusion)
         loss_fct = CrossEntropyLoss()
         loss = loss_fct(logits.view(-1, 28), labels.view(-1))
@@ -254,18 +246,15 @@ def compute_metrics(eval_pred):
     exp_logits = np.exp(logits)
     probabilities = exp_logits / np.sum(exp_logits, axis=1, keepdims=True)
 
-    # 获取概率最高的类别作为预测结果
+
     predictions = np.argmax(probabilities, axis=1)
 
-    # 检查预测和标签的长度是否相同
     if len(predictions) != len(labels):
         raise ValueError("Length of predictions and labels must be the same.")
 
-    # 检查是否存在 NaN 值
     if np.any(np.isnan(predictions)) or np.any(np.isnan(labels)):
         raise ValueError("Predictions and labels must not contain NaN.")
 
-    # 使用评估指标计算准确度
     return metric.compute(predictions=predictions, references=labels)
 
 
@@ -302,7 +291,7 @@ trainer.train()
 
 torch.cuda.empty_cache()
 
-duration = 1000  # 持续时间/ms
-frequency = 500  # 频率/Hz
+duration = 1000
+frequency = 500
 winsound.Beep(frequency, duration)
 

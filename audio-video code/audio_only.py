@@ -22,11 +22,9 @@ import numpy as np
 import torch
 
 def load_and_combine_batches(save_dir, partition_name):
-    """加载特定分区的所有批次，然后合并为一个数据集，显示进度条。"""
     batch_folders = [os.path.join(save_dir, partition_name, d) for d in
                      os.listdir(os.path.join(save_dir, partition_name))
                      if os.path.isdir(os.path.join(save_dir, partition_name, d))]
-    # 添加进度条
     datasets = [Dataset.load_from_disk(folder) for folder in
                 tqdm(sorted(batch_folders), desc=f"Loading batches from {partition_name}")]
     combined_dataset = concatenate_datasets(datasets)
@@ -34,13 +32,11 @@ def load_and_combine_batches(save_dir, partition_name):
 
 
 def create_dataset_dict(save_dir):
-    """创建包含训练集和测试集的DatasetDict，并设置为torch格式，显示进度条。"""
     print("Loading training data...")
     train_dataset = load_and_combine_batches(save_dir, 'train')
     print("Loading testing data...")
     test_dataset = load_and_combine_batches(save_dir, 'test')
 
-    # 将训练集和测试集设置为torch格式
     train_dataset.set_format(type='torch', columns=['pixel_values','input_values','labels'])
     test_dataset.set_format(type='torch', columns=['pixel_values','input_values','labels'])
 
@@ -50,9 +46,7 @@ def create_dataset_dict(save_dir):
     })
     return dataset_dict
 # input_values,attention_mask_audio,token_type_ids,position_ids,head_mask,inputs_embeds,labels,output_attentions,output_hidden_states,return_dict,label_ids,labels,label.
-os.environ['http_proxy'] = 'http://127.0.0.1:10809'
-os.environ['https_proxy'] = 'http://127.0.0.1:10809'
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+
 tokenizer = AutoTokenizer.from_pretrained("wav2vec2/")
 feature_extractor = Wav2Vec2Processor.from_pretrained("wav2vec2/")
 
@@ -104,7 +98,6 @@ class audio_only_model(nn.Module):
         outputs = self.model(input_values)
         hidden_states = outputs.hidden_states
 
-        # 取第1层作为分类器的输入
         logits = self.classifier(hidden_states[1][:, 0, :])
         # print("logits shape:", logits.shape)
         # print("labels shape:", labels.shape)
@@ -130,18 +123,14 @@ def compute_metrics(eval_pred):
     exp_logits = np.exp(logits)
     probabilities = exp_logits / np.sum(exp_logits, axis=1, keepdims=True)
 
-    # 获取概率最高的类别作为预测结果
     predictions = np.argmax(probabilities, axis=1)
 
-    # 检查预测和标签的长度是否相同
     if len(predictions) != len(labels):
         raise ValueError("Length of predictions and labels must be the same.")
 
-    # 检查是否存在 NaN 值
     if np.any(np.isnan(predictions)) or np.any(np.isnan(labels)):
         raise ValueError("Predictions and labels must not contain NaN.")
 
-    # 使用评估指标计算准确度
     return metric.compute(predictions=predictions, references=labels)
 
 from transformers import TrainingArguments, Trainer
