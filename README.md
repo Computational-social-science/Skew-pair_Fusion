@@ -13,3 +13,6 @@ The availability of datasets used in this study is detailed as follows:
 (2) Audio-Video fusion experiments: the AVE (Audio-Visual Event Localization) dataset (https://github.com/YashNita/Audio-Visual-Event-Localization-in-Unconstrained-Videos). 
 (3) Image-Text fusion experiments: the Hateful Memes (https://github.com/facebookresearch/mmf). 
 (4) Text-Text fusion experiments: the parallel corpus C4EL (https://github.com/Computational-social-science/C4EL).
+
+# License
+This work is licensed under a CC BY 4.0 License.
