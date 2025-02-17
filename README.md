@@ -14,5 +14,8 @@ The availability of datasets used in this study is detailed as follows:
 (3) Image-Text fusion experiments: the Hateful Memes (https://github.com/facebookresearch/mmf). 
 (4) Text-Text fusion experiments: the parallel corpus C4EL (https://github.com/Computational-social-science/C4EL).
 
+## Citing this work
+The relevant paper is currently under review, during which time this repository is private. Once it goes public, a bibtex reference will be provided here.
+
 # License
 This work is licensed under a CC BY 4.0 License.
